@@ -18,6 +18,9 @@ import (
    "strconv"
    "runtime"
    "sync"
+   "os"
+   "log"
+   "runtime/pprof"
 )
 
 var n = 0
@@ -43,12 +46,24 @@ func (n *Node) itemCheck() int {
 
 const minDepth = 4
 
+var cpuprofile = flag.String("cpuprofile","","write cpu profile to file")
+var memprofile = flag.String("memprofile","","write mem profile to file")
 
-func main() {  
+func main() {
    runtime.GOMAXPROCS(4)
- 	
+
    flag.Parse()
    if flag.NArg() > 0 { n,_ = strconv.Atoi( flag.Arg(0) ) }
+
+   if *cpuprofile != "" {
+       fmt.Printf("Start cpu profiling, dump to %s\n", *cpuprofile)
+       f,err := os.Create(*cpuprofile)
+       if err != nil {
+           log.Fatal(err)
+       }
+       pprof.StartCPUProfile(f)
+       defer pprof.StopCPUProfile()
+   }
 
    maxDepth := n
    if minDepth + 2 > n {
@@ -60,9 +75,20 @@ func main() {
    fmt.Printf("stretch tree of depth %d\t check: %d\n", stretchDepth, check_l)
 
    longLivedTree := bottomUpTree(0, maxDepth)
-   
+
    var wg sync.WaitGroup
    result := make( []string, maxDepth+1)
+
+   if *memprofile != "" {
+       fmt.Printf("Start memory profiling, dump to %s\n", *memprofile)
+       f, err := os.Create(*memprofile)
+       if err != nil {
+           log.Fatal(err)
+       }
+       pprof.WriteHeapProfile(f)
+       f.Close()
+       return
+   }
 
    for depth_l := minDepth; depth_l <= maxDepth; depth_l+=2 {
           wg.Add(1)
@@ -83,5 +109,4 @@ func main() {
        fmt.Println( result[depth])
    }
    fmt.Printf("long lived tree of depth %d\t check: %d\n", maxDepth, longLivedTree.itemCheck())
-   
 }
